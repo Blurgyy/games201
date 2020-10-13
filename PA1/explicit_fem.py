@@ -13,9 +13,10 @@ n_nodes = (1 + side) * side // 2  # Total number of nodes
 n_elems = (side - 1) * (side - 1)  # Total number of triangle elements
 E = 1000  # Young's modulus
 nu = 0.2  # Poisson's ratio
-lame_1 = E / (2 * (1 + nu))
-lame_2 = (E * nu) / ((1 + nu) * (1 - 2 * nu))
+lame_1 = E / (2 * (1 + nu))  # mu
+lame_2 = (E * nu) / ((1 + nu) * (1 - 2 * nu))  # Lambda
 gravity = [0, -9.8]
+dt = 1e-5
 # bulk_K = E / (2 * (1 - 2 * v))
 
 nodes = ti.Vector(n=simdim, dt=ti.f32,
@@ -23,11 +24,29 @@ nodes = ti.Vector(n=simdim, dt=ti.f32,
 verts = ti.var(dt=ti.int32,
                shape=(n_elems,
                       3))  # Stores indices of the 3 vertices on each element
-
+Bm = ti.Matrix(simdim, simdim, dt=ti.f32, shape=n_elems)
 
 @ti.func
 def elem_cnt(x: int) -> int:
     return 2 * x - 3
+
+
+@ti.func
+def lower_than_ground(x: ti.Vector) -> bool:
+    return x.y < 0.2
+
+
+@ti.func
+def Dm(x: int) -> ti.Matrix:
+    n0 = verts[x, 0]
+    n1 = verts[x, 1]
+    n2 = verts[x, 2]
+    return ti.Matrix.cols([nodes[n0] - nodes[n2], nodes[n1] - nodes[n2]])
+
+
+@ti.func
+def get_Bm(x: int):
+    Bm[x] = Dm(x).inverse()
 
 
 @ti.kernel
@@ -55,8 +74,14 @@ def build():
                 # print(nodeid, nodeid+1, nodeid+nodecnt)
 
 
+@ti.kernel
+def integrate(dt: ti.f32):
+    pass
+
+
 def main():
     build()
+    integrate(dt)
 
 
 if __name__ == "__main__":
